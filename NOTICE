@@ -1,0 +1,3 @@
+image-backend-stb (MIT) embeds stb_image.h and stb_image_write.h by Sean Barrett
+(https://github.com/nothings/stb), public domain / MIT dual-licensed, at Fedora's
+pinned commit with Fedora's patch set applied (native/vendor/PROVENANCE.md).
