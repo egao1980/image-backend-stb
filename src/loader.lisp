@@ -28,7 +28,7 @@
 
 (defun load-stb-cl ()
   "Load libstb-cl from the first search directory that has it. Idempotent.
-Signals PTY-NATIVE-UNAVAILABLE."
+Signals IMAGE-NATIVE-UNAVAILABLE."
   (unless *loaded*
     (let* ((name (%library-name))
            (dir (find-if (lambda (d) (probe-file (merge-pathnames name d))) (%search-dirs))))
