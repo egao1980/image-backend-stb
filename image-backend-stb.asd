@@ -1,5 +1,5 @@
 (defsystem "image-backend-stb"
-  :version "0.2.0"
+  :version "0.2.1"
   :description "image-protocol backend on stb_image / stb_image_write (vendored with Fedora's security patches)"
   :author "egao1980"
   :license "MIT"
@@ -12,19 +12,8 @@
                (:native-library "stb-cl")
                (:file "backend"))
   :in-order-to ((test-op (test-op "image-backend-stb/tests")))
-  :properties
-  (:cl-repo
-   (:cffi-libraries ("libstb-cl")
-    :provides ("image-backend-stb")
-    :overlays
-    ((:platform (:os "linux" :arch "amd64")
-      :layers ((:role "native-library" :files (("lib/linux-amd64/libstb-cl.so" . "libstb-cl.so")))))
-     (:platform (:os "linux" :arch "arm64")
-      :layers ((:role "native-library" :files (("lib/linux-arm64/libstb-cl.so" . "libstb-cl.so")))))
-     (:platform (:os "darwin" :arch "arm64")
-      :layers ((:role "native-library" :files (("lib/darwin-arm64/libstb-cl.dylib" . "libstb-cl.dylib")))))
-     (:platform (:os "windows" :arch "amd64")
-      :layers ((:role "native-library" :files (("lib/windows-amd64/stb-cl.dll" . "stb-cl.dll")))))))))
+  ;; Overlays: lib/<os>-<arch>/ per platform, from the :native-library components.
+  :properties (:cl-repo (:provides ("image-backend-stb"))))
 
 (defsystem "image-backend-stb/tests"
   :depends-on ("image-backend-stb" "rove")
