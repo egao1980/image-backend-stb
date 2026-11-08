@@ -1,13 +1,15 @@
 (defsystem "image-backend-stb"
-  :version "0.1.0"
+  :version "0.2.0"
   :description "image-protocol backend on stb_image / stb_image_write (vendored with Fedora's security patches)"
   :author "egao1980"
   :license "MIT"
+  :defsystem-depends-on ("asdf-native")
   :depends-on ("image-protocol" "cffi" "uiop")
   :serial t
   :pathname "src"
   :components ((:file "package")
-               (:file "loader")
+               ;; $STB_CL_NATIVE, native/ (overlay), lib/<os>-<arch>/ (checkout)
+               (:native-library "stb-cl")
                (:file "backend"))
   :in-order-to ((test-op (test-op "image-backend-stb/tests")))
   :properties
