@@ -15,6 +15,23 @@
 - **GIF frame by frame.** GIF goes through `stbi__gif_load_next` one frame at a time, keeping only the two frames disposal needs, and checks the frame and byte budget each step. Plain stb would allocate every frame first.
 - **No native memory escapes.** Pixels are copied into Lisp and freed in `unwind-protect`.
 
+## Native resize (0.3.0, contract)
+
+A method on image-protocol 0.3.0's `backend-resize` resizes with [stb_image_resize2](https://github.com/nothings/stb_image_resize) (2.51). It runs only when the caller names the backend; loading this system registers it for decoding and encoding only.
+
+```lisp
+(stack-image:resize-image img 800 600 :filter :bicubic
+                          :backend (make-instance 'image-backend-stb:stb-backend))
+```
+
+| | |
+|---|---|
+| Served | `:bilinear` (stb's triangle) and `:bicubic` (Catmull-Rom, which is Pillow's Keys cubic with a = −0.5), in every pixel format, in sRGB values. A `:reducing-gap` is accepted and not applied |
+| Declined | `:lanczos3` (stb has no Lanczos-3), `:box` (stb's trapezoid matches Pillow's box only at integer ratios), `:nearest`, `:linear t`. The protocol's pure-Lisp resampler does these |
+| Closeness | Close to the protocol's Pillow-equal samples, not equal: stb keeps floats between its passes and clamps the kernel at the edges. Over every case of `tests/fixtures/resize-tolerance.sexp`, with edges included and colour compared premultiplied, the largest sample difference is at most 43 and the mean at most 3.2. That is the worst case measured against Pillow 11.3 plus a quarter (`scripts/resize-tolerance.py`; `--report` shows that a wrong filter, edge mode, alpha layout or data type breaks these bounds) |
+
+The rules (S1–S8: the C call, ABI 2, vendoring, memory, failure) are in `src/resize.lisp`, and the tests are in `tests/resize-test.lisp`.
+
 `scripts/build-stb-cl.sh [os-arch …]` cross-builds the overlays with `zig cc` (linux amd64/arm64, darwin arm64, windows amd64). `scripts/make-fixtures.py` regenerates the test fixtures with Pillow.
 
 ## License
