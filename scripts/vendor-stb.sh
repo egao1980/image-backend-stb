@@ -4,12 +4,29 @@
 # Fedora's stb.spec, in order. Upstream has left the GHSL-2023 fixes
 # unmerged since 2023; the distros carry them.
 #
+# Also vendors native/vendor/stb_image_resize2.h, unpatched, from
+# nothings/stb_image_resize at a pinned commit (the header left nothings/stb,
+# and Fedora's stb pin has none), and fails unless its SHA-256 is the pinned one.
+#
 #   scripts/vendor-stb.sh            (writes native/vendor/ + PROVENANCE.md)
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SPEC_URL="https://src.fedoraproject.org/rpms/stb/raw/rawhide/f/stb.spec"
 RAW="https://src.fedoraproject.org/rpms/stb/raw/rawhide/f"
+RESIZE_URL="https://github.com/nothings/stb_image_resize"
+RESIZE_COMMIT="a4f303e34a92d1410d510cbe85a1781ce4b8c9fd"
+RESIZE_SHA256="9a653683b5fafba0f5c7911d163ede7d92c64dcd1e482407bd8b44aa155925ce"
 WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT
+
+# The resize header first, so a moved pin fails before native/vendor/ is touched.
+git -C "$WORK" init -q resize
+git -C "$WORK/resize" fetch -q --depth 1 "$RESIZE_URL" "$RESIZE_COMMIT"
+git -C "$WORK/resize" checkout -q FETCH_HEAD
+got="$(shasum -a 256 "$WORK/resize/stb_image_resize2.h" | awk '{print $1}')"
+[[ "$got" == "$RESIZE_SHA256" ]] ||
+  { echo "stb_image_resize2.h: SHA-256 $got, pinned $RESIZE_SHA256" >&2; exit 1; }
+RESIZE_VERSION="$(sed -nE '1s/^.* - v([0-9.]+) - .*$/\1/p' "$WORK/resize/stb_image_resize2.h")"
+[[ -n "$RESIZE_VERSION" ]] || { echo "no version in stb_image_resize2.h" >&2; exit 1; }
 
 curl -fsSL "$SPEC_URL" -o "$WORK/stb.spec"
 COMMIT="$(sed -nE 's/^%global commit ([0-9a-f]{40})/\1/p' "$WORK/stb.spec" | head -1)"
@@ -36,7 +53,14 @@ while read -r patch; do
   fi
 done < <(sed -nE 's/^Patch[0-9]*:[[:space:]]+(.*)$/\1/p' "$WORK/stb.spec")
 
-cp "$WORK/stb/stb_image.h" "$WORK/stb/stb_image_write.h" "$ROOT/native/vendor/"
+# Fedora's pin or a live pull/N.patch head can move: say which codec header changes.
+for f in stb_image.h stb_image_write.h; do
+  [[ ! -f "$ROOT/native/vendor/$f" ]] || cmp -s "$WORK/stb/$f" "$ROOT/native/vendor/$f" ||
+    echo "note: $f differs from the committed copy" >&2
+done
+
+cp "$WORK/stb/stb_image.h" "$WORK/stb/stb_image_write.h" "$WORK/resize/stb_image_resize2.h" \
+   "$ROOT/native/vendor/"
 {
   echo "# native/vendor/"
   echo
@@ -52,10 +76,18 @@ cp "$WORK/stb/stb_image.h" "$WORK/stb/stb_image_write.h" "$ROOT/native/vendor/"
   echo
   for p in "${applied[@]}"; do echo "- \`$p\`"; done
   echo
+  echo "stb_image_resize2.h (not in Fedora's pin; vendored unpatched):"
+  echo
+  echo "| | |"
+  echo "|---|---|"
+  echo "| Upstream | $RESIZE_URL @ \`$RESIZE_COMMIT\` |"
+  echo "| Version | $RESIZE_VERSION |"
+  echo "| License | public domain / MIT (dual) |"
+  echo
   echo "SHA-256:"
   echo
   echo '```'
-  (cd "$ROOT/native/vendor" && shasum -a 256 stb_image.h stb_image_write.h)
+  (cd "$ROOT/native/vendor" && shasum -a 256 stb_image.h stb_image_write.h stb_image_resize2.h)
   echo '```'
 } > "$ROOT/native/vendor/PROVENANCE.md"
-echo "vendored stb $COMMIT with ${#applied[@]} patches"
+echo "vendored stb $COMMIT with ${#applied[@]} patches, stb_image_resize2 $RESIZE_VERSION at $RESIZE_COMMIT"

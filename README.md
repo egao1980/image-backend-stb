@@ -9,13 +9,13 @@
 | 16-bit | Samples come back as 16 bits and the protocol reduces them with rounding |
 
 **Hardening** (from the [research notes](https://github.com/egao1980/cl-stack/blob/main/docs/research/image-libraries.md)):
-- **Patched sources.** Upstream stb still has the GHSL-2023 CVEs open. `native/vendor/` is stb at Fedora's pinned commit with Fedora's whole patch set, reproduced by `scripts/vendor-stb.sh` and recorded with hashes in `native/vendor/PROVENANCE.md`.
+- **Patched sources.** Upstream stb still has the GHSL-2023 CVEs open. `native/vendor/` is stb at Fedora's pinned commit with Fedora's whole patch set, reproduced by `scripts/vendor-stb.sh` and recorded with hashes in `native/vendor/PROVENANCE.md`. The same script vendors `stb_image_resize2.h` unpatched at a pinned commit, and fails unless its SHA-256 is the pinned one.
 - **Build flags.** `STBI_NO_STDIO`, only the formats above compiled in (no PIC), and `STBI_MAX_DIMENSIONS` 2¹⁵ as a second line behind the protocol's limits. stb is compiled privately into `libstb-cl` (`STB_IMAGE_STATIC`), so its process-wide flags are ours alone, and no setter is called at decode time.
 - **Locked writes.** PNG writing sets stb's global compression level under a lock.
 - **GIF frame by frame.** GIF goes through `stbi__gif_load_next` one frame at a time, keeping only the two frames disposal needs, and checks the frame and byte budget each step. Plain stb would allocate every frame first.
-- **No native memory escapes.** Pixels are copied into Lisp and freed in `unwind-protect`.
+- **No native memory escapes.** Pixels are copied into Lisp and freed in `unwind-protect`. Resize writes straight into a pinned Lisp vector, so no native buffer comes back (stb frees its own scratch memory before returning).
 
-## Native resize (0.3.0, contract)
+## Native resize (0.3.0)
 
 A method on image-protocol 0.3.0's `backend-resize` resizes with [stb_image_resize2](https://github.com/nothings/stb_image_resize) (2.51). It runs only when the caller names the backend; loading this system registers it for decoding and encoding only.
 

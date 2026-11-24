@@ -1,6 +1,6 @@
 (in-package #:image-backend-stb)
 
-(defconstant +abi+ 1)
+(defconstant +abi+ 2)
 
 (cffi:defcfun ("stbcl_abi" %abi) :int)
 (cffi:defcfun ("stbcl_failure_reason" %failure-reason) :string)
@@ -17,6 +17,9 @@
   (format :int) (w :int) (h :int) (comp :int) (pixels :pointer) (level :int) (quality :int)
   (out-len :pointer))
 (cffi:defcfun ("stbcl_free_buffer" %free-buffer) :void (p :pointer))
+;; ABI 2: resize.lisp, S3/S4.
+(cffi:defcfun ("stbcl_resize" %resize) :int
+  (in :pointer) (w :int) (h :int) (comp :int) (out :pointer) (nw :int) (nh :int) (filter :int))
 
 (unless (= (%abi) +abi+)
   (error 'img:image-native-unavailable

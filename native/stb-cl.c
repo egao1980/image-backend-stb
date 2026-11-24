@@ -12,6 +12,9 @@
  *   a write global, so writes take a lock and set it per call.
  * - GIF frames are decoded one at a time (stbi__gif_load_next), keeping only
  *   the two frames disposal needs, instead of stb allocating every frame.
+ * - stb_image_resize2 (nothings/stb_image_resize, unpatched) is compiled in
+ *   privately too (STB_IMAGE_RESIZE_STATIC). Its medium API keeps no global
+ *   state, so stbcl_resize takes no lock.
  */
 #include <stdint.h>
 #include <stdlib.h>
@@ -36,6 +39,10 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "vendor/stb_image_write.h"
 
+#define STB_IMAGE_RESIZE_STATIC
+#define STB_IMAGE_RESIZE_IMPLEMENTATION
+#include "vendor/stb_image_resize2.h"
+
 #if defined(_WIN32)
 #include <windows.h>
 #define CL_API __declspec(dllexport)
@@ -50,7 +57,7 @@ static pthread_mutex_t write_lock = PTHREAD_MUTEX_INITIALIZER;
 #define UNLOCK() pthread_mutex_unlock(&write_lock)
 #endif
 
-#define STB_CL_ABI 1
+#define STB_CL_ABI 2
 
 CL_API int stbcl_abi(void) { return STB_CL_ABI; }
 
@@ -174,3 +181,20 @@ CL_API uint8_t *stbcl_encode(int format, int w, int h, int comp, const uint8_t *
 }
 
 CL_API void stbcl_free_buffer(uint8_t *p) { free(p); }
+
+/* ---- Resizing (ABI 2; src/resize.lisp S3/S4) ---------------------------- */
+
+/* filter: 2 STBIR_FILTER_TRIANGLE, 4 STBIR_FILTER_CATMULLROM. Straight alpha
+ * (stb weights colour by alpha), UINT8 values, edge clamp, packed rows.
+ * → 1 once OUT holds the NW × NH × COMP result. → 0 without writing OUT for
+ * any other filter, a COMP outside 1–4, a side below 1, or when stbir fails. */
+CL_API int stbcl_resize(const uint8_t *in, int w, int h, int comp,
+                        uint8_t *out, int nw, int nh, int filter) {
+  static const stbir_pixel_layout layouts[4] = {STBIR_1CHANNEL, STBIR_RA, STBIR_RGB, STBIR_RGBA};
+  if (filter != STBIR_FILTER_TRIANGLE && filter != STBIR_FILTER_CATMULLROM) return 0;
+  if (comp < 1 || comp > 4) return 0;
+  if (w < 1 || h < 1 || nw < 1 || nh < 1) return 0;
+  if (!in || !out) return 0;   /* with a NULL OUT stbir would allocate and return its own buffer */
+  return stbir_resize(in, w, h, 0, out, nw, nh, 0, layouts[comp - 1], STBIR_TYPE_UINT8,
+                      STBIR_EDGE_CLAMP, (stbir_filter)filter) != NULL;
+}

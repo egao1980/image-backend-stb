@@ -86,16 +86,27 @@
 ;;;     (max 43, mean 3.2). They reject a wrong filter, edge mode, alpha
 ;;;     layout or data type (scripts/resize-tolerance.py --report).
 ;;;
-;;; The contract: %RESIZE-PENDING marks what is left to write.
-
-(defun %resize-pending (what)
-  "Contract stub for the native resize. Every call is replaced by the
-implementation, then this function is deleted."
-  (error "image-backend-stb native resize pending: ~A" what))
+;;; S2's decline is the CASE below. S3's call is %RESIZE (backend.lisp, with
+;;; the rest of the C ABI).
 
 (defmethod img:backend-resize ((backend stb-backend) image width height
                                &key filter reducing-gap linear)
   "S2–S7: IMAGE resized by stb_image_resize2 for :BILINEAR and :BICUBIC
 without LINEAR; NIL (declined) otherwise."
-  (declare (ignorable image width height filter reducing-gap linear))
-  (%resize-pending 'img:backend-resize))
+  (declare (ignore reducing-gap))       ; S2: accepted, not applied
+  (let ((code (and (not linear)
+                   (case filter (:bilinear 2) (:bicubic 4))))) ; S3: TRIANGLE, CATMULLROM
+    (when code
+      (let* ((format (img:image-format image))
+             (comp (img:channels format))
+             (pixels (img:image-pixels image))
+             (out (make-array (* width height comp) :element-type '(unsigned-byte 8)))
+             (status (cffi:with-pointer-to-vector-data (in pixels) ; S5: pinned, no copy
+                       (cffi:with-pointer-to-vector-data (o out)
+                         (%resize in (img:image-width image) (img:image-height image) comp
+                                  o width height code)))))
+        ;; S7, signalled once both pins are released. The protocol's
+        ;; TRY-NEXT-BACKEND (R7) is the recovery; nothing is established here.
+        (when (zerop status)
+          (error 'img:image-native-unavailable :backend backend :cause "stbir_resize failed"))
+        (img:make-image :width width :height height :format format :depth 8 :pixels out)))))

@@ -18,7 +18,9 @@ host_pair() {
 }
 
 build() {
-  local pair=$1 target out flags=(-O2 -shared -fvisibility=hidden -Wall -Wno-unused-function)
+  # -ffp-contract=off: no fused multiply-add, so stb_image_resize2 gives the
+  # same bytes on every target.
+  local pair=$1 target out flags=(-O2 -shared -fvisibility=hidden -Wall -Wno-unused-function -ffp-contract=off)
   out="${ROOT}/lib/${pair}"; mkdir -p "$out"
   case "$pair" in
     linux-amd64) target="x86_64-linux-gnu.${GLIBC}" ;;
