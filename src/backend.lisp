@@ -1,6 +1,6 @@
 (in-package #:image-backend-stb)
 
-(defconstant +abi+ 1)
+(defconstant +abi+ 2)
 
 (cffi:defcfun ("stbcl_abi" %abi) :int)
 (cffi:defcfun ("stbcl_failure_reason" %failure-reason) :string)
@@ -17,6 +17,20 @@
   (format :int) (w :int) (h :int) (comp :int) (pixels :pointer) (level :int) (quality :int)
   (out-len :pointer))
 (cffi:defcfun ("stbcl_free_buffer" %free-buffer) :void (p :pointer))
+;; ABI 2: resize.lisp, S3/S4.
+(cffi:defcfun ("stbcl_resize" %%resize) :int
+  (in :pointer) (w :int) (h :int) (comp :int) (out :pointer) (nw :int) (nh :int) (filter :int))
+
+(defun %resize (in w h comp out nw nh filter)
+  "stbcl_resize with IEEE float traps masked. stb_image_resize2's float
+kernels (SIMD on some targets) may raise overflow / invalid flags in
+intermediate lanes that are discarded; SBCL's enabled traps would turn
+those into FLOATING-POINT-OVERFLOW inside the foreign call."
+  #+sbcl
+  (sb-int:with-float-traps-masked (:overflow :invalid :divide-by-zero :inexact :underflow)
+    (%%resize in w h comp out nw nh filter))
+  #-sbcl
+  (%%resize in w h comp out nw nh filter))
 
 (unless (= (%abi) +abi+)
   (error 'img:image-native-unavailable

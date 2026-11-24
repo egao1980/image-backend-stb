@@ -34,9 +34,18 @@ Patches touching the image headers:
 - `issue-1929.patch`
 - `cve-2026-79516.patch`
 
+stb_image_resize2.h (not in Fedora's pin; vendored unpatched):
+
+| | |
+|---|---|
+| Upstream | https://github.com/nothings/stb_image_resize @ `a4f303e34a92d1410d510cbe85a1781ce4b8c9fd` |
+| Version | 2.51 |
+| License | public domain / MIT (dual) |
+
 SHA-256:
 
 ```
 7603b5de9773066b765d2c03e01fe13a6cbaed4d159520f9ba4dde31c9a5733f  stb_image.h
 cbd5f0ad7a9cf4468affb36354a1d2338034f2c12473cf1a8e32053cb6914a05  stb_image_write.h
+9a653683b5fafba0f5c7911d163ede7d92c64dcd1e482407bd8b44aa155925ce  stb_image_resize2.h
 ```
