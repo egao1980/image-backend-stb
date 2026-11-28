@@ -1,10 +1,10 @@
 (defsystem "image-backend-stb"
-  :version "0.3.0"
+  :version "0.3.1"
   :description "image-protocol backend on stb_image / stb_image_write (vendored with Fedora's security patches), plus a native resize fast path on stb_image_resize2"
   :author "egao1980"
   :license "MIT"
   :defsystem-depends-on ("asdf-native")
-  :depends-on ((:version "image-protocol" "0.3.0") "cffi" "uiop")
+  :depends-on ((:version "image-protocol" "0.3.0") (:version "buffer-protocol" "0.1.0") "cffi" "uiop")
   :serial t
   :pathname "src"
   :components ((:file "package")

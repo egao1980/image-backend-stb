@@ -70,8 +70,18 @@ those into FLOATING-POINT-OVERFLOW inside the foreign call."
                          :animated-p (and (eq format :gif) t))))
 
 (defun %copy-out (pointer count)
+  "One memcpy (buffer-protocol), not a mem-aref per byte (#8)."
+  (stack-buffer:foreign-to-vector pointer count))
+
+(defun %copy-out-16-to-8 (pointer count)
+  "COUNT 16-bit samples at POINTER → octets in one typed pass, rounded like
+   IMG:DEPTH-16-TO-8: (round (* v 255) 65535) = (round v 257). No boxed
+   intermediate vector (#8)."
   (let ((out (make-array count :element-type '(unsigned-byte 8))))
-    (dotimes (i count out) (setf (aref out i) (cffi:mem-aref pointer :uint8 i)))))
+    (declare (type (simple-array (unsigned-byte 8) (*)) out) (fixnum count))
+    (dotimes (i count out)
+      (setf (aref out i)
+            (values (round (the (unsigned-byte 16) (cffi:mem-aref pointer :uint16 i)) 257))))))
 
 (defun %decode-one (b format octets limits)
   (multiple-value-bind (w h c is16) (%info format octets b)
@@ -87,9 +97,7 @@ those into FLOATING-POINT-OVERFLOW inside the foreign call."
                  (img:make-image
                   :width w :height h :format (%format-of c)
                   :pixels (if is16
-                              (let ((samples (make-array count)))
-                                (dotimes (i count) (setf (aref samples i) (cffi:mem-aref pixels :uint16 i)))
-                                (img:depth-16-to-8 samples))
+                              (%copy-out-16-to-8 pixels count)
                               (%copy-out pixels count))))
             (%free pixels)))))))
 

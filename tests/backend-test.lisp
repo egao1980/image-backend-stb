@@ -69,3 +69,18 @@
   (ok (signals (img:decode-image (fixture "bomb.png") :limits (img:make-image-limits :unlimited t))
                'img:image-decode-error))
   (ok (= 3 (img:image-info-width (img:probe-image (fixture "rgb.png"))))))
+
+(deftest sixteen-bit-rounding-matches-depth-16-to-8
+  "#8: the typed 16→8 pass rounds exactly like IMG:DEPTH-16-TO-8 for every value."
+  (let ((n 65536))
+    (cffi:with-foreign-object (p :uint16 n)
+      (dotimes (v n) (setf (cffi:mem-aref p :uint16 v) v))
+      (let ((all (loop for v below n collect v)))
+        (ok (equalp (img:depth-16-to-8 (coerce all 'vector))
+                    (image-backend-stb::%copy-out-16-to-8 p n)))))))
+
+(deftest gray16-decodes-the-same
+  (let ((i (img:decode-image (fixture "gray16.png"))))
+    (ok (typep (img:image-pixels i) '(simple-array (unsigned-byte 8) (*))))
+    (ok (= (* (img:image-width i) (img:image-height i) (img:channels (img:image-format i)))
+           (length (img:image-pixels i))))))
